@@ -3,6 +3,7 @@
 
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
 def add_datetime_column(df, timestamp_col="timestamp", new_col="datetime"):
     """Convert Unix timestamp to readable datetime column"""
@@ -64,7 +65,7 @@ def show_column_stats(df, col):
     print("Mean:", df[col].mean())
     print("Median:", df[col].median())
     print("Unique values:", df[col].nunique())
-    print("Top 5 values:", df[col].value_counts().head(5).to_dict())
+    print("ALL values:", df[col].value_counts().to_dict())
     print()
 
 def plot_ratings_over_time(df, freq="M", date_col="datetime"):
@@ -107,9 +108,82 @@ def count_rows_per_year(df, date_col="datetime"):
 
 
 
+def plot_top_bottom_users_horizontal(df, top_n=30):
+    """
+    Plot horizontal bar charts of top and bottom N users by number of ratings.
+    X-axis: number of ratings (integers)
+    Y-axis: user_id
+    """
+    counts = df.groupby("user_id")["rating"].count()
+    
+    # top N users
+    top_counts = counts.sort_values(ascending=True).tail(top_n)
+    plt.figure(figsize=(10,8))
+    ax = top_counts.plot(kind="barh", color='orange')
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.xlabel("Number of ratings")
+    plt.ylabel("User ID")
+    plt.title(f"Top {top_n} users by number of ratings")
+    plt.show()
+    
+    # bottom N users
+    bottom_counts = counts.sort_values(ascending=True).head(top_n)
+    plt.figure(figsize=(10,8))
+    ax = bottom_counts.plot(kind="barh", color='lightcoral')
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.xlabel("Number of ratings")
+    plt.ylabel("User ID")
+    plt.title(f"Bottom {top_n} users by number of ratings")
+    plt.show()
 
 
+def plot_top_bottom_products_horizontal(df, top_n=20):
+    """
+    Plot horizontal bar charts of top and bottom N products by number of ratings.
+    X-axis: number of ratings (integers)
+    Y-axis: product_id
+    """
+    counts = df.groupby("product_id")["rating"].count()
+    
+    # top N products
+    top_counts = counts.sort_values(ascending=True).tail(top_n)
+    plt.figure(figsize=(10,6))
+    ax = top_counts.plot(kind="barh", color='skyblue')
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.xlabel("Number of ratings")
+    plt.ylabel("Product ID")
+    plt.title(f"Top {top_n} products by number of ratings")
+    plt.show()
+    
+    # bottom N products
+    bottom_counts = counts.sort_values(ascending=True).head(top_n)
+    plt.figure(figsize=(10,6))
+    ax = bottom_counts.plot(kind="barh", color='lightblue')
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.xlabel("Number of ratings")
+    plt.ylabel("Product ID")
+    plt.title(f"Bottom {top_n} products by number of ratings")
+    plt.show()
 
+    # Number of products with 1 or two  ratings 
+def count_products_by_num_ratings(df):
+    """
+    Count how many products have 1 rating, 2 ratings, 3 ratings, etc.
+    Prints a table and plots a bar chart.
+    """
+    counts = df.groupby("product_id")["rating"].count()  # liczba ocen na produkt
+    freq = counts.value_counts().sort_index()           # ile produktów ma X ocen
+    
+    print("Number of products by number of ratings:")
+    print(freq)
+    
+    # plot
+    plt.figure(figsize=(10,5))
+    plt.bar(freq.index.astype(str), freq.values, color='skyblue')
+    plt.xlabel("Number of ratings per product")
+    plt.ylabel("Number of products")
+    plt.title("Products by number of ratings")
+    plt.show()
 
 
 
