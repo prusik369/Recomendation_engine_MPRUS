@@ -1,7 +1,7 @@
 from datetime import timedelta
 import pandas as pd
 
-def compute_weighted_rating(df, rating_col="rating", min_votes=3):
+def compute_weighted_rating(df, rating_col="rating", min_votes=5):
     """
     Computes weighted rating using IMDB formula:
     WR = (v / (v + m)) * R + (m / (v + m)) * C
