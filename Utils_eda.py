@@ -1,6 +1,6 @@
 # Utils_eda.py
 # Simple EDA functions for ratings dataset: missing values, timestamps, ratings, time analysis
-
+import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
@@ -21,12 +21,50 @@ def show_time_range(df, date_col="datetime"):
     print("Min:", dates.min().strftime("%Y-%m-%d %H:%M:%S"))
     print("Max:", dates.max().strftime("%Y-%m-%d %H:%M:%S"))
 
+
+def count_unique_values(df):
+    """
+    Count unique values for user_id, product_id, and rating columns.
+    """
+    print("Unique values per column:")
+    print(f"  user_id: {df['user_id'].nunique()}")
+    print(f"  product_id: {df['product_id'].nunique()}")
+    print(f"  rating: {df['rating'].nunique()}")
+
 def check_missing_values(df):
     """Count missing values per column"""
     missing = df.isna().sum()
     print("Missing values per column:")
     print(missing)
     return missing
+
+def detect_duplicates(df):
+    """
+    Detects duplicates in the dataset:
+    - exact duplicates (all columns identical)
+    - duplicate user-product pairs (same user rated same product multiple times)
+    
+    Returns a dictionary of DataFrames.
+    """
+
+    # 1. Exact duplicates (every column identical)
+    exact_dupes = df[df.duplicated(keep=False)]
+
+    # 2. User–product duplicate pairs
+    # Only rows where both user_id and product_id match more than once
+    pair_dupes = (
+        df[df.duplicated(subset=["user_id", "product_id"], keep=False)]
+        .sort_values(["user_id", "product_id", "timestamp"])
+    )
+
+    print("=== DUPLICATE REPORT ===")
+    print(f"Exact duplicates: {len(exact_dupes)} rows")
+    print(f"Duplicate user-product pairs: {len(pair_dupes)} rows\n")
+
+    return {
+        "exact_duplicates": exact_dupes,
+        "duplicate_user_product_pairs": pair_dupes
+    }
 
 def show_rows_with_nulls(df):
     """Display rows with at least one NaN"""
@@ -177,13 +215,227 @@ def count_products_by_num_ratings(df):
     print("Number of products by number of ratings:")
     print(freq)
     
-    # plot
-    plt.figure(figsize=(10,5))
-    plt.bar(freq.index.astype(str), freq.values, color='skyblue')
-    plt.xlabel("Number of ratings per product")
+def plot_sparsity_matrix(df, max_users=200, max_items=200):
+    """
+    Visualize sparsity of the user-item rating matrix (binary: rated / not rated).
+    Only top active users and top popular items are included to keep the plot readable.
+    """
+    user_counts = df["user_id"].value_counts().head(max_users).index
+    item_counts = df["product_id"].value_counts().head(max_items).index
+
+    subset = df[(df["user_id"].isin(user_counts)) & (df["product_id"].isin(item_counts))]
+    pivot = subset.pivot_table(index="user_id", columns="product_id", values="rating", aggfunc="count").fillna(0)
+
+    plt.figure(figsize=(10, 8))
+    plt.imshow(pivot, aspect='auto', interpolation='nearest')
+    plt.title("User-Item Sparsity Matrix (1 = rated, 0 = not rated)")
+    plt.xlabel("Product ID")
+    plt.ylabel("User ID")
+    plt.colorbar(label="Rated")
+    plt.show()
+
+
+def plot_ratings_per_product_hist(df):
+    """Plots full histogram of number of ratings per product + limited version (Y<=20)."""
+    import matplotlib.pyplot as plt
+
+    counts = df.groupby("product_id")["rating"].count()
+
+    # --- Full histogram ---
+    plt.figure(figsize=(10, 5))
+    plt.hist(counts, bins=30)
+    plt.title("Histogram of Number of Ratings per Product")
+    plt.xlabel("Number of ratings")
+    plt.ylabel("Frequency")
+    plt.show()
+
+    # --- Limited Y-axis histogram (max 20) ---
+    plt.figure(figsize=(10, 5))
+    plt.hist(counts, bins=30)
+    plt.title("Histogram of Number of Ratings per Product (X-axis limited to 20)")
+    plt.xlabel("Number of ratings")
+    plt.ylabel("Frequency")
+    plt.xlim(0, 20)   # Limit Y-axis
+    plt.show()
+
+def plot_ratings_per_product_hist(df):
+    """
+    Histogram showing how many ratings each product has.
+    Helps evaluate item popularity distribution for item-based CF.
+    """
+    counts = df.groupby("product_id")["rating"].count()
+
+    plt.figure(figsize=(10, 5))
+    plt.hist(counts, bins=30, edgecolor="black")
+    plt.title("Ratings per Product")
+    plt.xlabel("Number of ratings")
     plt.ylabel("Number of products")
-    plt.title("Products by number of ratings")
+    plt.show()
+
+def plot_user_similarity_heatmap(df, top_n=100):
+    """
+    Heatmap of user-user rating correlations for the top N most active users.
+    Temporary conversion to categorical to handle sparse IDs.
+    """
+    # Work on a copy to avoid changing original df
+    df_copy = df.copy()
+    df_copy["user_id"] = df_copy["user_id"].astype("category")
+    df_copy["product_id"] = df_copy["product_id"].astype("category")
+    
+    top_users = df_copy["user_id"].value_counts().head(top_n).index
+    subset = df_copy[df_copy["user_id"].isin(top_users)]
+    
+    pivot = subset.pivot_table(index="user_id", columns="product_id", values="rating")
+    corr = pivot.T.corr(min_periods=2)
+    
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(corr, cmap="coolwarm", center=0, square=True)
+    plt.title(f"User-User Rating Correlation Heatmap (Top {top_n} Active Users)")
+    plt.xlabel("User ID")
+    plt.ylabel("User ID")
+    plt.show()
+
+
+def plot_item_similarity_heatmap(df, top_n=100):
+    """
+    Heatmap of item-item rating correlations for the top N most popular products.
+    Temporary conversion to categorical to handle sparse IDs.
+    """
+    df_copy = df.copy()
+    df_copy["user_id"] = df_copy["user_id"].astype("category")
+    df_copy["product_id"] = df_copy["product_id"].astype("category")
+    
+    top_products = df_copy["product_id"].value_counts().head(top_n).index
+    subset = df_copy[df_copy["product_id"].isin(top_products)]
+    
+    pivot = subset.pivot_table(index="product_id", columns="user_id", values="rating")
+    corr = pivot.T.corr(min_periods=2)
+    
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(corr, cmap="coolwarm", center=0, square=True)
+    plt.title(f"Item-Item Rating Correlation Heatmap (Top {top_n} Popular Products)")
+    plt.xlabel("Product ID")
+    plt.ylabel("Product ID")
+    plt.show()
+
+
+def plot_top_products_trends(df, top_n=10):
+    """
+    Shows rating counts per month for the top N most-rated products.
+    Useful for identifying long-term popularity trends.
+    """
+    df = df.copy()
+    df["year_month"] = df["datetime"].dt.to_period("M")
+
+    top_items = df["product_id"].value_counts().head(top_n).index
+    subset = df[df["product_id"].isin(top_items)]
+
+    grouped = subset.groupby(["year_month", "product_id"])["rating"].count().unstack(fill_value=0)
+
+    grouped.plot(figsize=(12, 6))
+    plt.title(f"Monthly Rating Counts for Top {top_n} Products")
+    plt.xlabel("Year-Month")
+    plt.ylabel("Number of Ratings")
+    plt.grid(True)
+    plt.show()
+
+def plot_avg_rating_per_year(df):
+    """
+    Average rating per year to detect rating drift over time.
+    Shows whether ratings become more strict or more lenient.
+    """
+    df = df.copy()
+    df["year"] = df["datetime"].dt.year
+
+    yearly = df.groupby("year")["rating"].mean()
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(yearly.index, yearly.values, marker="o")
+    plt.title("Average Rating per Year")
+    plt.xlabel("Year")
+    plt.ylabel("Average Rating")
+    plt.ylim(0, 5)
+    plt.grid(True)
     plt.show()
 
 
 
+def count_sparse_users_products(df, user_threshold=10, product_threshold=5):
+    """
+    Count users with less than 'user_threshold' ratings
+    and products with less than 'product_threshold' ratings.
+    """
+    # Count ratings per user
+    user_counts = df.groupby("user_id")["rating"].count()
+    num_users = (user_counts < user_threshold).sum()
+    
+    # Count ratings per product
+    product_counts = df.groupby("product_id")["rating"].count()
+    num_products = (product_counts < product_threshold).sum()
+    
+    print(f"Number of users with less than {user_threshold} ratings: {num_users}")
+    print(f"Number of products with less than {product_threshold} ratings: {num_products}")
+
+def count_products_by_num_ratings(df, max_ratings=25):
+    """
+    Count how many products have exactly X ratings, for X=1..max_ratings.
+    Useful to decide filtering thresholds.
+    """
+    counts = df.groupby("product_id")["rating"].count()
+    freq = counts.value_counts().sort_index()
+
+    print(f"Products with 1 to {max_ratings} ratings:")
+    for i in range(1, max_ratings+1):
+        print(f"  {i} ratings: {freq.get(i, 0)} products")
+
+def analyze_cutoff_impact(df, product_min_ratings=5, user_low_n=10):
+    """
+    Analyze the impact of filtering products with few ratings and inspect user activity.
+    
+    Parameters:
+        df (pd.DataFrame): DataFrame with columns ['user_id', 'product_id', 'rating'].
+        product_min_ratings (int): Minimum number of ratings a product must have to stay.
+        user_low_n (int): How many lowest activity levels to display for users.
+    
+    Returns:
+        None
+    """
+    
+    # 1. Product filtering
+    count_unique_values(df)
+
+    product_counts = df['product_id'].value_counts()
+    print("=== 1. Product rating counts BEFORE filtering ===")
+    print(product_counts.describe())
+    
+    low_rated_products = product_counts[product_counts < product_min_ratings]
+    print(f"\nProducts with < {product_min_ratings} ratings: {len(low_rated_products)}")
+    
+    df_filtered = df[~df['product_id'].isin(low_rated_products.index)]
+    print(f"\nRecords BEFORE filtering: {len(df)}")
+    print(f"Records AFTER filtering: {len(df_filtered)}")
+    print(f"Removed: {len(df) - len(df_filtered)} records ({(len(df) - len(df_filtered))/len(df)*100:.2f}%)")
+    count_unique_values(df_filtered)
+    # 2. User activity after filtering
+    user_activity = df_filtered.groupby('user_id').size().rename('num_ratings')
+    total_users = user_activity.shape[0]
+    print(f"\n=== 2. User activity (ratings per user) AFTER filtering ===")
+    print(f"Total unique users after filtering: {total_users}")
+    
+    # Lowest N activity levels
+    activity_distribution = user_activity.value_counts().sort_index()
+    print(f"\n=== Lowest {user_low_n} activity levels (explained) ===")
+    print("\nColumns:")
+    print("ratings_per_user -> number of ratings a user made")
+    print("num_users -> number of users with that number of ratings\n")
+    
+    lowest_activity_df = activity_distribution.head(user_low_n).reset_index()
+    lowest_activity_df.columns = ["ratings_per_user", "num_users"]
+    
+    
+
+    # Explanation example for clarity
+    for _, row in lowest_activity_df.iterrows():
+        print(f"ratings_per_user = {row['ratings_per_user']} → num_users = {row['num_users']}")
+    
+    return df_filtered
