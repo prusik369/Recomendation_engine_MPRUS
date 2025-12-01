@@ -76,12 +76,12 @@ def dataset_statistics(df, user_col="user_id", product_col="product_id"):
     avg_ratings_per_user = df.groupby(user_col).size().mean()
     avg_ratings_per_product = df.groupby(product_col).size().mean()
     
-    print("Dataset statistics:")
-    print(f"  Rows: {num_rows}")
-    print(f"  Unique users: {num_users}")
-    print(f"  Unique products: {num_products}")
-    print(f"  Avg ratings per user: {avg_ratings_per_user:.2f}")
-    print(f"  Avg ratings per product: {avg_ratings_per_product:.2f}")
+    # print("Dataset statistics:")
+    # print(f"  Rows: {num_rows}")
+    # print(f"  Unique users: {num_users}")
+    # print(f"  Unique products: {num_products}")
+    # print(f"  Avg ratings per user: {avg_ratings_per_user:.2f}")
+    # print(f"  Avg ratings per product: {avg_ratings_per_product:.2f}")
 
 def clean_rating_dataset(df, timestamp_cols=["timestamp"], rating_col="rating", user_col="user_id", product_col="product_id"):
     """
@@ -93,14 +93,66 @@ def clean_rating_dataset(df, timestamp_cols=["timestamp"], rating_col="rating", 
       5. Print final dataset statistics
     Returns the cleaned DataFrame.
     """
-    print("=== Initial dataset statistics ===")
+    # print("=== Initial dataset statistics ===")
     dataset_statistics(df, user_col=user_col, product_col=product_col)
     
     df_clean = remove_nulls_except_timestamp(df, timestamp_cols=timestamp_cols)
     df_clean = remove_user_product_duplicates(df_clean, user_col=user_col, product_col=product_col)
     df_clean = remove_min_max_ratings(df_clean, rating_col=rating_col)
     
-    print("=== Final cleaned dataset statistics ===")
-    dataset_statistics(df_clean, user_col=user_col, product_col=product_col)
+    # print("=== Final cleaned dataset statistics ===")
+    # dataset_statistics(df_clean, user_col=user_col, product_col=product_col)
     
     return df_clean
+
+def analyze_cutoff_impact(df, product_min_ratings=5, user_low_n=10):
+    """
+    Analyze the impact of filtering products with few ratings and inspect user activity.
+    
+    Parameters:
+        df (pd.DataFrame): DataFrame with columns ['user_id', 'product_id', 'rating'].
+        product_min_ratings (int): Minimum number of ratings a product must have to stay.
+        user_low_n (int): How many lowest activity levels to display for users.
+    
+    Returns:
+        None
+    """
+    
+    # 1. Product filtering
+    # count_unique_values(df)
+
+    product_counts = df['product_id'].value_counts()
+    # print("=== 1. Product rating counts BEFORE filtering ===")
+    # print(product_counts.describe())
+    
+    low_rated_products = product_counts[product_counts < product_min_ratings]
+    # print(f"\nProducts with < {product_min_ratings} ratings: {len(low_rated_products)}")
+    
+    df_filtered = df[~df['product_id'].isin(low_rated_products.index)]
+    # print(f"\nRecords BEFORE filtering: {len(df)}")
+    # print(f"Records AFTER filtering: {len(df_filtered)}")
+    # print(f"Removed: {len(df) - len(df_filtered)} records ({(len(df) - len(df_filtered))/len(df)*100:.2f}%)")
+    # count_unique_values(df_filtered)
+    # 2. User activity after filtering
+    user_activity = df_filtered.groupby('user_id').size().rename('num_ratings')
+    total_users = user_activity.shape[0]
+    # print(f"\n=== 2. User activity (ratings per user) AFTER filtering ===")
+    # print(f"Total unique users after filtering: {total_users}")
+    
+    # Lowest N activity levels
+    activity_distribution = user_activity.value_counts().sort_index()
+    # print(f"\n=== Lowest {user_low_n} activity levels (explained) ===")
+    # print("\nColumns:")
+    # print("ratings_per_user -> number of ratings a user made")
+    # print("num_users -> number of users with that number of ratings\n")
+    
+    lowest_activity_df = activity_distribution.head(user_low_n).reset_index()
+    lowest_activity_df.columns = ["ratings_per_user", "num_users"]
+    
+    
+
+    # # Explanation example for clarity
+    # for _, row in lowest_activity_df.iterrows():
+    #     print(f"ratings_per_user = {row['ratings_per_user']} → num_users = {row['num_users']}")
+    
+    return df_filtered

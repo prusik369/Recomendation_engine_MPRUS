@@ -376,7 +376,7 @@ def count_sparse_users_products(df, user_threshold=10, product_threshold=5):
     print(f"Number of users with less than {user_threshold} ratings: {num_users}")
     print(f"Number of products with less than {product_threshold} ratings: {num_products}")
 
-def count_products_by_num_ratings(df, max_ratings=25):
+def count_products_by_num_ratings(df, max_ratings=16):
     """
     Count how many products have exactly X ratings, for X=1..max_ratings.
     Useful to decide filtering thresholds.
@@ -434,7 +434,7 @@ def analyze_cutoff_impact(df, product_min_ratings=5, user_low_n=10):
     
     
 
-    # Explanation example for clarity
+    # # Explanation example for clarity
     for _, row in lowest_activity_df.iterrows():
         print(f"ratings_per_user = {row['ratings_per_user']} → num_users = {row['num_users']}")
     

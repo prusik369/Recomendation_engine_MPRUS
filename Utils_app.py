@@ -1,25 +1,30 @@
 from datetime import timedelta
 import pandas as pd
 
-def compute_weighted_rating(df, rating_col="rating"):
+def compute_weighted_rating(df, rating_col="rating", min_votes=3):
     """
-    weighted rating:
+    Computes weighted rating using IMDB formula:
     WR = (v / (v + m)) * R + (m / (v + m)) * C
     where:
-    - R = average rating of item
-    - v = number of ratings
-    - m = minimum votes
-    - C = global mean rating
+        R = average rating for the movie
+        v = number of votes
+        m = minimum votes required to be listed
+        C = mean vote across the dataset
     """
-
+    # global mean
     C = df[rating_col].mean()
-    m = df.groupby("product_id")[rating_col].count()
 
+    # minimum votes threshold
+    m = min_votes
+
+    # product stats
     stats = df.groupby("product_id")[rating_col].agg(["mean", "count"])
     stats = stats.rename(columns={"mean": "avg_rating", "count": "num_votes"})
 
+    # keep only items with enough votes
     stats = stats[stats["num_votes"] >= m].copy()
 
+    # weighted rating formula
     stats["weighted_rating"] = (
         (stats["num_votes"] / (stats["num_votes"] + m)) * stats["avg_rating"]
         + (m / (stats["num_votes"] + m)) * C
