@@ -37,7 +37,8 @@ def top_n(pred_matrix, user_id, n=5):
 # -------------------------
 def main():
     parser = argparse.ArgumentParser(description="Recommender system script with cleaning/filtering (SVD + Item-Based CF)")
-    parser.add_argument("--file", type=str, required=True, help="Path to ratings CSV file")
+    parser.add_argument("--file", type=str, default="data/ratings.csv",
+                        help="Path to ratings dataset")
     parser.add_argument("--n_svd", type=int, default=20, help="Number of components for SVD")
     parser.add_argument("--top_n", type=int, default=5, help="Number of top recommendations per user")
     parser.add_argument("--n_users", type=int, default=3, help="Number of random users to show recommendations for")
