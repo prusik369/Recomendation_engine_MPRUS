@@ -99,7 +99,7 @@ def main():
     print("\n=== TOP RECOMMENDATIONS ===")
 
     print("Building train matrix...")
-    train_m = build_train_matrix(df_time)
+    train_m = build_train_matrix(df_filtered)
 
     print("Loading model...")
     model = load_model(args.model)
